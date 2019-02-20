@@ -237,6 +237,14 @@ RemoveHypervTools()
 	fi
 }
 
+ERR_LOG_FILE="/tmp/.lis-rpm-output.log"
+CaptureErrWarn()
+{
+	if [ -f $ERR_LOG_FILE ];then
+		cat $ERR_LOG_FILE | grep -v "mlx5_ib"
+		rm -f $ERR_LOG_FILE
+	fi
+}
 
 function installbuildrpm()
 {
@@ -247,8 +255,9 @@ function installbuildrpm()
 	if [ "$kmodrpm" != "" ] && [ "$msrpm" != ""  ];
 	then
 		echo "Installing the Linux Integration Services for Microsoft Hyper-V..."
-		rpm -ivh $kmodrpm $msrpm
+		rpm -ivh $kmodrpm $msrpm 2> ${ERR_LOG_FILE}
 		kmodexit=$?
+		CaptureErrWarn
 		if [ "$kmodexit" != 0 ]; then
 			echo "Microsoft-Hyper-V RPM installation failed, Exiting."
             		exit 1
@@ -267,8 +276,9 @@ function upgradebuildrpm()
 	msrpm=`ls microsoft-hyper-v-*.x86_64.rpm`
 	if [ "$kmodrpm" != "" ] && [ "$msrpm" != ""  ];
 	then
-		rpm -Uvh $kmodrpm $msrpm
+		rpm -Uvh $kmodrpm $msrpm 2> ${ERR_LOG_FILE}
 	        msexit=$?
+		CaptureErrWarn
         	if [ "$msexit" != 0 ]; then
 	    		echo "Microsoft-Hyper-V rpm Upgradation failed, Exiting"
 		        exit 1
