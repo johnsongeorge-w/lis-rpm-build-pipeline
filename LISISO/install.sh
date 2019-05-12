@@ -101,6 +101,8 @@ if [[ $distro_version == "7"* ]]; then
 fi
 
 cd ${targetDir}
+CheckRequiredSpace
+[ $?? -eq 0 ] && exit 1
 
 #
 # If the daemons are left installed, the new rpms will fail to install

@@ -167,6 +167,58 @@ IsInstalledKernelOlderThanErrataKernel()
 	return 1
 }
 
+function CheckLibModulePartition()
+{
+	if (( $root_part_avail_space < $root_part_required_space ));then
+		echo "LIS installation aborted due to insufficient space"
+		printf "\t %s \t %s\n" "$lib_module_folder" "available: $root_part_avail_space required: $root_part_required_space"
+		return 0
+        fi
+	return 1
+}
+
+function CheckBootPartition()
+{
+	if (( $boot_part_avail_space < $boot_part_required_space ));then
+		echo "LIS installation aborted due to insufficiant space"
+		printf "\t %s \t\t %s\n" "$boot_folder" "available: $boot_part_avail_space required: $boot_part_required_space"
+		return 0
+	fi
+	return 1
+}
+
+function CheckRequiredSpace()
+{
+	#200 MB of space required in root partition to generate initramfs
+	MIN_SPACE_FOR_RAMFS_CREATION=204800
+
+	lib_module_folder="/lib/modules"
+	boot_folder="/boot"
+
+	root_partition=`df $lib_module_folder | grep -v Used | awk '{ print $1}'`
+	boot_partition=`df $boot_folder | grep -v Used | awk '{ print $1}'`
+
+	root_part_avail_space=`echo $(($(stat -f --format="%a*%S" $lib_module_folder)))`
+	boot_part_avail_space=`echo $(($(stat -f --format="%a*%S" $boot_folder)))`
+
+	lib_module_required_space=`rpm --queryformat='%{SIZE}' -qp kmod-microsoft-hyper*`
+	ramdisk_required_space=`stat /boot/initramfs-$(uname -r).img --format="%s"`
+
+	boot_part_required_space=$ramdisk_required_space
+	if [ $root_partition != $boot_partition ];then
+		root_part_required_space=`expr $MIN_SPACE_FOR_RAMFS_CREATION + $ramdisk_required_space + $lib_module_required_space`
+		CheckLibModulePartition
+		ret=$?
+		[ $ret -eq 1 ] && CheckBootPartition
+		ret=$?
+	else
+		root_part_required_space=`expr $MIN_SPACE_FOR_RAMFS_CREATION + 2 \* $ramdisk_required_space + $lib_module_required_space`
+		CheckLibModulePartition
+		ret=$?
+	fi
+	return $ret
+}
+
 RemoveHypervDaemons()
 {
 	echo "Removing Hyper-V daemons"
