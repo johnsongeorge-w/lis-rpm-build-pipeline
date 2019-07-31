@@ -260,8 +260,6 @@ RemoveHypervDaemons()
                         exit 1
                 fi
         fi
-
-
 }
 
 RemoveHypervTools()
@@ -330,32 +328,45 @@ function GetUpdateNumber()
 	return $update_number
 }
 
+function detectrpmpackages()
+{
+	kmodrpm=$(ls kmod-microsoft-hyper-v-*.$(uname -m).rpm 2> /dev/null)
+	msrpm=$(ls microsoft-hyper-v-*.$(uname -m).rpm 2> /dev/null)
+
+	is_pae_kernel=$(uname -r | grep PAE)
+	[[ ! -z "$is_pae_kernel" ]] && kmodrpm=$(ls kmod-microsoft-hyper-v-PAE*.$(uname -m).rpm 2> /dev/null)
+
+	if [[ -z $kmodrpm || -z $msrpm ]];then
+		echo "Linux Integration Services RPMs not found for $distro_version $(uname -r)"
+		exit 1
+	fi
+}
+
 function installbuildrpm()
 {
 	i=$1
 	source ${LIS_INSTALL_BASE_DIR}/lis_compatibility_check.sh
 	GetDistroVersion
+
 	cd "update${i}" &> /dev/null
-	kmodrpm=`ls kmod-microsoft-hyper-v-*.x86_64.rpm`
-	msrpm=`ls microsoft-hyper-v-*.x86_64.rpm`
-	if [ "$kmodrpm" != "" ] && [ "$msrpm" != ""  ];
-	then
-		# Check lis compatibility with kernel
-		[[ $distro_version == "7"* ]] && CheckLISCompatibility
+	detectrpmpackages
 
-		# Remove conflicting module before installation
-		RemoveConflictingModules
+	# Check lis compatibility with kernel
+	[[ $distro_version == "7"* ]] && CheckLISCompatibility
 
-		echo "Installing the Linux Integration Services for Microsoft Hyper-V..."
-		rpm -ivh $kmodrpm $msrpm 2>&1 | grep -v "mlx5_ib"
-		kmodexit=$?
-		if [ "$kmodexit" != 0 ]; then
-			echo "Microsoft-Hyper-V RPM installation failed, Exiting."
-            		exit 1
-		else
-			echo " Linux Integration Services for Hyper-V has been installed. Please reboot your system."
-			exit 0
-		fi
+	# Remove conflicting module before installation
+	RemoveConflictingModules
+
+	echo "Installing $kmodrpm $msrpm..."
+	echo "Installing the Linux Integration Services for Microsoft Hyper-V..."
+	rpm -ivh $kmodrpm $msrpm 2>&1 | grep -v "mlx5_ib"
+	kmodexit=$?
+	if [ "$kmodexit" != 0 ]; then
+		echo "Microsoft-Hyper-V RPM installation failed, Exiting."
+		exit 1
+	else
+		echo " Linux Integration Services for Hyper-V has been installed. Please reboot your system."
+		exit 0
 	fi
 }
 
@@ -364,37 +375,25 @@ function upgradebuildrpm()
 	i=$1
 	source ${LIS_INSTALL_BASE_DIR}/lis_compatibility_check.sh
 	GetDistroVersion
+
 	cd "update${i}" &> /dev/null
-	kmodrpm=`ls kmod-microsoft-hyper-v-*.x86_64.rpm`
-	msrpm=`ls microsoft-hyper-v-*.x86_64.rpm`
-	if [ "$kmodrpm" != "" ] && [ "$msrpm" != ""  ];
-	then
-		# Check lis compatibility with kernel
-		[[ $distro_version == "7"* ]] && CheckLISCompatibility
+	detectrpmpackages
 
-		# Remove conflicting module before installation
-		RemoveConflictingModules
+	# Check lis compatibility with kernel
+	[[ $distro_version == "7"* ]] && CheckLISCompatibility
 
-		rpm -Uvh $kmodrpm $msrpm 2>&1 | grep -v "mlx5_ib"
-	        msexit=$?
-        	if [ "$msexit" != 0 ]; then
-	    		echo "Microsoft-Hyper-V rpm Upgradation failed, Exiting"
-		        exit 1
-            	else
-	        	echo "Linux Integration Services for Hyper-V has been Upgraded. Please reboot your system"
-			exit 0
-        	fi
-	fi
-}
+	# Remove conflicting module before installation
+	RemoveConflictingModules
 
-function checkrpms()
-{
-	kmodrpm=`ls kmod-microsoft-hyper-v-*.x86_64.rpm`
-        msrpm=`ls microsoft-hyper-v-*.x86_64.rpm`
-        if [ "$kmodrpm" != "" ] && [ "$msrpm" != ""  ]; then
-		echo "RPM's are available"
+	echo "Upgrading $kmodrpm $msrpm..."
+	rpm -Uvh $kmodrpm $msrpm 2>&1 | grep -v "mlx5_ib"
+	msexit=$?
+	if [ "$msexit" != 0 ]; then
+		echo "Microsoft-Hyper-V rpm Upgradation failed, Exiting"
+		exit 1
 	else
-		echo "RPM's are missing"
+		echo "Linux Integration Services for Hyper-V has been Upgraded. Please reboot your system"
+		exit 0
 	fi
 }
 
@@ -425,7 +424,7 @@ function CheckRequiredSpace()
 	root_part_avail_space=$(($(stat -f --format="%f*%S" $lib_module_folder)))
 	boot_part_avail_space=$(($(stat -f --format="%f*%S" $boot_folder)))
 
-	lib_module_required_space=$(rpm --queryformat='%{SIZE}' -qp kmod-microsoft-hyper*x86_64.rpm)
+	lib_module_required_space=$(rpm --queryformat='%{SIZE}' -qp kmod-microsoft-hyper*$(uname -m).rpm)
 	ramdisk_required_space=$(stat /boot/initramfs-$(uname -r).img --format="%s")
 
 	boot_part_required_space=$ramdisk_required_space

@@ -1,9 +1,10 @@
 #!/bin/bash
 
-arch="$1"
-
 #source the ips.sh
 . ./ips.sh
+
+# License file for RH5.X distro
+LICENSE_FILE="LICENSE_GPL"
 
 ips_contents=$(cat ./ips.sh)
 for line in $ips_contents; do
@@ -37,8 +38,6 @@ for line in $ips_contents; do
         if [[ "$update_number" =~ "update" ]]; then
             lis_rpm_build_destination="${lis_rpm_build_destination}_UPDATE"
         fi
-        lis_srpm_build_destination="${lis_rpm_build_destination}/lis-$version/"
-        lis_rpm_build_destination="${lis_rpm_build_destination}/lis-$version/${arch_destination_dir}"
     elif [[ "$version" =~ ^6.* ]]; then
         if [[ "$update_number" =~ "update" ]]; then
             lis_rpm_build_destination="$lis_rpm_build_destination/$update_number"
@@ -59,10 +58,20 @@ for line in $ips_contents; do
     # Create a new update<number> folder.
     [ ! -d $lis_rpm_build_destination ] && mkdir -p $lis_rpm_build_destination
 
-    #Copy the new generated RPMs
+    # Copy the new generated RPMs
     scp -r root@${ip}:${lis_rpm_build_source}/* $lis_rpm_build_destination
 
-    #Generate the errata kernel list which will used for installation.
+    # Copy the GPL_LICENSE file for RH5.X LIS package
+    if [[ "$version" =~ ^5.* ]]; then
+        if [[ ! -f $LICENSE_FILE ]];then
+            echo "EXCEPTION: $LICENSE_FILE missing. Build aborted..."
+            exit 1
+        else
+            cp $LICENSE_FILE $lis_rpm_build_destination
+        fi
+    fi
+
+    # Generate the errata kernel list which will used for installation.
     if [[ "$update_number" =~ "update" ]]; then
 	lis_rpm_install_destination="LISISO/RPMS${version}"
 	kernel=$(ssh root@$ip "uname -r" 2> /dev/null)
@@ -76,8 +85,4 @@ for line in $ips_contents; do
     if [[ x"$lis_srpm_build_destination" != x ]];then
         scp -r root@${ip}:${lis_srpm_source}/* $lis_srpm_build_destination
     fi
-
-    # For 32 bit build RPMS7X folders are not required and should be cleaned up.
-    [[ ! -z ${arch} && ${arch} == "x32" ]] && rm -rf LISISO/RPMS7* || echo "${arch} build"
-
 done

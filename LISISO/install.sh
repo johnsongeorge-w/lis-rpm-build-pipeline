@@ -102,14 +102,10 @@ if [[ $distro_version != "5"* ]]; then
 	[ $? -eq 0 ] && exit 1
 fi
 
-if [[ $distro_version != "7"* ]]; then
-	# Remove conflicting module before installation
-	RemoveConflictingModules
-fi
-
-# Invoke the release specific install script
-echo "Invoking release specific install file in directory ${targetDir}"
-./install.sh
+echo "Installing from directory ${targetDir}"
+GetUpdateNumber
+update=$?
+installbuildrpm $update
 
 exit $? 
 

@@ -90,14 +90,9 @@ fi
 
 cd ${targetDir}
 
-if [[ $distro_version != "7"* ]]; then
-	# Remove conflicting module before installation
-	RemoveConflictingModules
-fi
+echo "Upgrading RPM from directory ${targetDir}"
+GetUpdateNumber
+update=$?
+upgradebuildrpm $update
 
-# Invoke the release specific install script
-echo "Invoking release specific install file in directory ${targetDir}"
-./upgrade.sh
-
-exit $? 
-
+exit $?
